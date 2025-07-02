@@ -2,4 +2,10 @@ venv/
 .env
 __pycache__/
 *.pyc
-vectorstore/db_faiss/
+
+# Ignore all of db_faiss folder by default...
+vectorstore/db_faiss/*
+
+# ...except these two files
+!vectorstore/db_faiss/index.faiss
+!vectorstore/db_faiss/index.pkl
