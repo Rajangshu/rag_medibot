@@ -7,7 +7,7 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_core.prompts import PromptTemplate
 
-# --- Use LangChain's Gemini integration ---
+# --- Use LangChain's Gemini integration to use gemini ---
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 DB_FAISS_PATH = "vectorstore/db_faiss/"
