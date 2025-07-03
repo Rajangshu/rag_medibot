@@ -1,30 +1,83 @@
-import logging
-logging.getLogger("pypdf").setLevel(logging.ERROR)
+# addpdf.py
 
-from langchain_community.document_loaders import PyPDFLoader, DirectoryLoader
+from dotenv import load_dotenv
+load_dotenv()
+
+import os
+import glob
+import uuid
+from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_community.vectorstores import FAISS
+from pinecone import Pinecone, ServerlessSpec
 
+# Constants
 DATA_PATH = "data/"
-DB_FAISS_PATH = "vectorstore/db_faiss/"
+INDEX_NAME = os.getenv("PINECONE_INDEX_NAME")
+API_KEY = os.getenv("PINECONE_API_KEY")
 
-# 1. Load only the PDFs currently in data/
-loader = DirectoryLoader(DATA_PATH, glob='*.pdf', loader_cls=PyPDFLoader)
-documents = loader.load()
+# --- Load PDFs ---
+def load_pdf_files(data_path):
+    documents = []
+    pdf_files = glob.glob(os.path.join(data_path, "*.pdf"))
+    for path in pdf_files:
+        try:
+            print(f"📄 Loading: {path}")
+            loader = PyPDFLoader(path)
+            docs = loader.load()
+            for doc in docs:
+                doc.metadata["source"] = path
+            print(f"✅ Loaded {len(docs)} chunks from {path}")
+            documents.extend(docs)
+        except Exception as e:
+            print(f"❌ Skipping {path} due to error: {e}")
+    return documents
 
-# 2. Split into chunks
-text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-text_chunks = text_splitter.split_documents(documents)
+documents = load_pdf_files(DATA_PATH)
 
-# 3. Load existing vectorstore
-embedded_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-db = FAISS.load_local(DB_FAISS_PATH, embedded_model, allow_dangerous_deserialization=True)
+# --- Chunk the text ---
+splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+chunks = splitter.split_documents(documents)
 
-# 4. Add new chunks to the vectorstore
-db.add_documents(text_chunks)
+# --- Load embeddings ---
+embedder = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+vectors = [
+    {
+        "id": str(uuid.uuid4()),
+        "values": embedder.embed_query(chunk.page_content),
+        "metadata": {
+            "text": chunk.page_content,
+            **chunk.metadata
+        }
+    }
+    for chunk in chunks
+]
 
-# 5. Save the updated vectorstore
-db.save_local(DB_FAISS_PATH)
+# --- Initialize Pinecone (v3) ---
+pc = Pinecone(api_key=API_KEY)
 
-print("Successfully added the new PDFs to the FAISS vectorstore!")
+# Create index if not exists
+if INDEX_NAME not in pc.list_indexes().names():
+    print(f"🛠 Creating index '{INDEX_NAME}'...")
+    pc.create_index(
+        name=INDEX_NAME,
+        dimension=384,
+        metric="cosine",
+        spec=ServerlessSpec(cloud="aws", region="us-east-1")
+    )
+    print(f"✅ Created index: {INDEX_NAME}")
+else:
+    print(f"ℹ️ Using existing index: {INDEX_NAME}")
+
+# --- Upload to Pinecone ---
+index = pc.Index(INDEX_NAME)
+batch_size = 100
+total = len(vectors)
+print("📤 Uploading to Pinecone...")
+
+for i in range(0, total, batch_size):
+    batch = vectors[i:i + batch_size]
+    index.upsert(vectors=batch)
+    print(f"✅ Uploaded batch {i // batch_size + 1}/{(total - 1) // batch_size + 1}")
+
+print("🎉 All new PDFs have been added to Pinecone vectorstore.")
