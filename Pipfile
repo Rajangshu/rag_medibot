@@ -7,12 +7,11 @@ name = "pypi"
 langchain = "*"
 langchain-community = "*"
 langchain-huggingface = "*"
-faiss-cpu = "*"
 langchain-google-genai = "*"
+pinecone-client = "*"
 python-dotenv = "*"
 sentence-transformers = "*"
 streamlit = "*"
-
 
 [dev-packages]
 
