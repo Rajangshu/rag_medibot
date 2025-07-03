@@ -8,7 +8,7 @@ langchain = "*"
 langchain-community = "*"
 langchain-huggingface = "*"
 langchain-google-genai = "*"
-pinecone-client = "*"
+pinecone = "3.0.0"
 python-dotenv = "*"
 sentence-transformers = "*"
 streamlit = "*"
@@ -17,3 +17,4 @@ streamlit = "*"
 
 [requires]
 python_version = "3.12"
+
