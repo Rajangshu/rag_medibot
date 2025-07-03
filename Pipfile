@@ -8,10 +8,10 @@ langchain = "*"
 langchain-community = "*"
 langchain-huggingface = "*"
 langchain-google-genai = "*"
-pinecone = "3.0.0"
 python-dotenv = "*"
 sentence-transformers = "*"
 streamlit = "*"
+pinecone = ">=3.2.1"
 
 [dev-packages]
 
